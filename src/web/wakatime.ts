@@ -126,6 +126,15 @@ export class WakaTime {
     this.setStatusBarVisibility(this.showStatusBar);
     this.updateStatusBarText('WakaTime Initializing...');
 
+    this.loadOfflineQueue();
+    try {
+      if (typeof addEventListener === 'function') {
+        addEventListener('online', () => {
+          this.sendHeartbeats();
+        });
+      }
+    } catch (_) {}
+
     this.checkApiKey();
 
     this.setupEventListeners();
@@ -573,6 +582,7 @@ export class WakaTime {
       `Appending code-reviewing heartbeat to local buffer: ${JSON.stringify(heartbeat, null, 2)}`,
     );
     this.heartbeats.push(heartbeat);
+    await this.saveOfflineQueue();
 
     if (Date.now() - this.lastSent > SEND_BUFFER_SECONDS * 1000) {
       await this.sendHeartbeats();
@@ -745,10 +755,52 @@ export class WakaTime {
 
     this.logger.debug(`Appending heartbeat to local buffer: ${JSON.stringify(heartbeat, null, 2)}`);
     this.heartbeats.push(heartbeat);
+    await this.saveOfflineQueue();
 
     if (now - this.lastSent > SEND_BUFFER_SECONDS * 1000) {
       await this.sendHeartbeats();
     }
+  }
+
+  private async loadOfflineQueue(): Promise<void> {
+    try {
+      const saved = this.config.get<Heartbeat[]>('wakatime.offlineQueue');
+      if (Array.isArray(saved) && saved.length > 0) {
+        this.heartbeats.push(...saved);
+      }
+      const wsf = vscode.workspace.workspaceFolders?.[0];
+      if (wsf && wsf.uri.scheme === 'orbit') {
+        const qUri = vscode.Uri.joinPath(wsf.uri, '.hackatime-queue.json');
+        const raw = await vscode.workspace.fs.readFile(qUri);
+        const diskQueue = JSON.parse(new TextDecoder().decode(raw));
+        if (Array.isArray(diskQueue) && diskQueue.length > 0 && (!saved || saved.length === 0)) {
+          this.heartbeats.push(...diskQueue);
+        }
+      }
+    } catch (_) {}
+  }
+
+  private async saveOfflineQueue(): Promise<void> {
+    try {
+      if (this.heartbeats.length > 2000) {
+        this.heartbeats = this.heartbeats.slice(-2000);
+      }
+      await this.config.update('wakatime.offlineQueue', this.heartbeats);
+      const wsf = vscode.workspace.workspaceFolders?.[0];
+      if (wsf && wsf.uri.scheme === 'orbit') {
+        const qUri = vscode.Uri.joinPath(wsf.uri, '.hackatime-queue.json');
+        if (this.heartbeats.length === 0) {
+          try {
+            await vscode.workspace.fs.delete(qUri);
+          } catch (_) {}
+        } else {
+          await vscode.workspace.fs.writeFile(
+            qUri,
+            new TextEncoder().encode(JSON.stringify(this.heartbeats)),
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   private async sendHeartbeats(): Promise<void> {
@@ -767,7 +819,8 @@ export class WakaTime {
     this.lastSent = Date.now();
 
     const plugin = this.getPlugin();
-    const payload = this.heartbeats.map((h) => {
+    const batch = this.heartbeats.slice(0, 100);
+    const payload = batch.map((h) => {
       const { entity_type, ...rest } = h;
       return {
         type: entity_type ?? 'file',
@@ -775,7 +828,6 @@ export class WakaTime {
         ...rest,
       };
     });
-    this.heartbeats = [];
 
     this.logger.debug(`Sending heartbeats to API: ${JSON.stringify(payload)}`);
 
@@ -795,7 +847,13 @@ export class WakaTime {
       });
       const parsedJSON = await response.json();
       if (response.status == 200 || response.status == 201 || response.status == 202) {
-        if (this.showStatusBar) this.getCodingActivity();
+        this.heartbeats.splice(0, batch.length);
+        await this.saveOfflineQueue();
+        if (this.heartbeats.length > 0) {
+          await this._sendHeartbeats();
+        } else if (this.showStatusBar) {
+          this.getCodingActivity();
+        }
       } else {
         this.logger.warn(`API Error ${response.status}: ${JSON.stringify(parsedJSON)}`);
         if (response && response.status == 401) {
@@ -812,6 +870,11 @@ export class WakaTime {
             this.lastApiKeyPrompted = now;
           }
         } else {
+          if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+            // Drop malformed batch so it doesn't block the queue forever
+            this.heartbeats.splice(0, batch.length);
+            await this.saveOfflineQueue();
+          }
           const error_msg = `Error sending heartbeats (${response.status}); Check your browser console for more details.`;
           if (this.showStatusBar) {
             this.updateStatusBarText('Hackatime Error');
@@ -821,13 +884,14 @@ export class WakaTime {
         }
       }
     } catch (ex) {
-      this.logger.warn(`API Error: ${ex}`);
-      const error_msg = `Error sending heartbeats; Check your browser console for more details.`;
+      this.logger.warn(`Offline / network error sending heartbeats, queued (${this.heartbeats.length}): ${ex}`);
+      await this.saveOfflineQueue();
       if (this.showStatusBar) {
-        this.updateStatusBarText('Hackatime Error');
-        this.updateStatusBarTooltip(`Hackatime: ${error_msg}`);
+        this.updateStatusBarText(`Offline (${this.heartbeats.length} queued)`);
+        this.updateStatusBarTooltip(
+          `Hackatime: Working offline — ${this.heartbeats.length} heartbeat(s) saved and will sync automatically when back online.`,
+        );
       }
-      this.logger.error(error_msg);
     }
   }
 

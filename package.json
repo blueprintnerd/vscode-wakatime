@@ -1,7 +1,7 @@
 {
   "name": "vscode-wakatime",
-  "displayName": "WakaTime",
-  "description": "Metrics, insights, and time tracking automatically generated from your programming activity.",
+  "displayName": "Hackatime (WakaTime for Hack Club)",
+  "description": "Automatic time tracking and metrics for Hack Club's Hackatime v2.",
   "version": "30.2.1",
   "publisher": "WakaTime",
   "author": {
@@ -120,12 +120,7 @@
       "properties": {
         "wakatime.apiKey": {
           "type": "string",
-          "description": "Defaults to value from ~/.wakatime.cfg, unless running in browser.",
-          "scope": "application"
-        },
-        "wakatime.apiUrl": {
-          "type": "string",
-          "description": "Defaults to https://api.wakatime.com/api/v1.",
+          "description": "Your Hackatime v2 API key from https://hackatime.hackclub.com.",
           "scope": "application"
         },
         "wakatime.align": {

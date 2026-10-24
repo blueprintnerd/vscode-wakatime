@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 import { Desktop } from './desktop';
+import { HACKATIME_API_URL } from './constants';
 import { Logger } from './logger';
 import { Utils } from './utils';
 
@@ -305,10 +306,6 @@ export class Options {
     return vscode.workspace.getConfiguration().get('wakatime.apiKey') || '';
   }
 
-  private getApiUrlFromEditor(): string {
-    return vscode.workspace.getConfiguration().get('wakatime.apiUrl') || '';
-  }
-
   public getStatusBarAlignment(): vscode.StatusBarAlignment {
     const align: string = vscode.workspace.getConfiguration().get('wakatime.align') ?? '';
     switch (align) {
@@ -335,46 +332,8 @@ export class Options {
     return this.cache.api_key_from_env;
   }
 
-  public async getApiUrl(checkSettingsFile = false): Promise<string> {
-    let apiUrl = this.getApiUrlFromEditor();
-
-    if (!apiUrl) {
-      apiUrl = this.getApiUrlFromEnv();
-    }
-
-    if (!apiUrl && !checkSettingsFile) {
-      return '';
-    }
-
-    // people often accidentally enter their API Key into the API Url settings input
-    if (!Utils.validateApiUrl(apiUrl)) apiUrl = '';
-
-    if (!apiUrl) {
-      try {
-        apiUrl = await this.getSettingAsync<string>('settings', 'api_url');
-      } catch (err) {
-        this.logger.debug(`Exception while reading API Url from config file: ${err}`);
-      }
-    }
-
-    if (!apiUrl) apiUrl = 'https://api.wakatime.com/api/v1';
-
-    const suffixes = ['/', '.bulk', '/users/current/heartbeats', '/heartbeats', '/heartbeat'];
-    for (const suffix of suffixes) {
-      if (apiUrl.endsWith(suffix)) {
-        apiUrl = apiUrl.slice(0, -suffix.length);
-      }
-    }
-
-    return apiUrl;
-  }
-
-  private getApiUrlFromEnv(): string {
-    if (this.cache.api_url_from_env !== undefined) return this.cache.api_url_from_env;
-
-    this.cache.api_url_from_env = process.env.WAKATIME_API_URL || '';
-
-    return this.cache.api_url_from_env;
+  public async getApiUrl(_checkSettingsFile = false): Promise<string> {
+    return HACKATIME_API_URL;
   }
 
   public hasApiKey(callback: (valid: boolean) => void): void {

@@ -1,5 +1,10 @@
 import * as vscode from 'vscode';
-import { COMMON_AI_EXTENSIONS, TIME_BETWEEN_HEARTBEATS_MS } from './constants';
+import {
+  COMMON_AI_EXTENSIONS,
+  HACKATIME_API_URL,
+  HACKATIME_DASHBOARD_URL,
+  TIME_BETWEEN_HEARTBEATS_MS,
+} from './constants';
 
 export class Utils {
   private static appNames: { [key: string]: string } = {
@@ -31,20 +36,19 @@ export class Utils {
   }
 
   public static apiKeyInvalid(key?: string): string {
-    const err = 'Invalid api key... check https://wakatime.com/api-key for your key';
-    if (!key) return err;
+    const err = 'Invalid api key... check https://hackatime.hackclub.com for your key';
+    if (!key || !key.trim()) return err;
+    const trimmed = key.trim();
     const re = new RegExp(
-      '^(waka_)?[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$',
+      '^(waka_|hka_)?[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$',
       'i',
     );
-    if (!re.test(key)) return err;
+    if (!re.test(trimmed) && !/^[A-Za-z0-9_-]{20,}$/.test(trimmed)) return err;
     return '';
   }
 
-  public static validateApiUrl(url: string): string {
-    if (!url) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url.trim();
-    return '';
+  public static validateApiUrl(_url: string): string {
+    return HACKATIME_API_URL;
   }
 
   public static validateProxy(proxy: string): string {
@@ -130,13 +134,8 @@ export class Utils {
     return uri.scheme === 'vscode-remote';
   }
 
-  public static apiUrlToDashboardUrl(url: string): string {
-    url = url
-      .replace('://api.', '://')
-      .replace('/api/v1', '')
-      .replace(/^api\./, '')
-      .replace('/api', '');
-    return url;
+  public static apiUrlToDashboardUrl(_url: string): string {
+    return HACKATIME_DASHBOARD_URL;
   }
 
   public static enoughTimePassed(lastHeartbeat: number, now: number): boolean {

@@ -33,6 +33,9 @@ export const COMMON_AI_EXTENSIONS: AIExtension[] = [
   },
 ];
 
+export const HACKATIME_API_URL = 'https://hackatime.hackclub.com/api/hackatime/v1';
+export const HACKATIME_DASHBOARD_URL = 'https://hackatime.hackclub.com';
+
 export const COMMAND_API_KEY = 'wakatime.apikey';
 export const COMMAND_API_URL = 'wakatime.apiurl';
 export const COMMAND_CONFIG_FILE = 'wakatime.config_file';
@@ -63,7 +66,9 @@ export interface Heartbeat {
   is_write: boolean;
   lineno?: number;
   cursorpos?: number;
+  lines?: number;
   lines_in_file?: number;
+  project?: string;
   alternate_project?: string;
   project_folder?: string;
   project_root_count?: number;

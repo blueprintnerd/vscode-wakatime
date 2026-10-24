@@ -9,6 +9,7 @@ import {
   AI_RECENT_PASTES_TIME_MS,
   ALLOWED_SCHEMES,
   COMMAND_DASHBOARD,
+  HACKATIME_API_URL,
   Heartbeat,
   LogLevel,
   SEND_BUFFER_SECONDS,
@@ -246,8 +247,8 @@ export class WakaTime {
     let defaultVal = await this.options.getApiKey();
     if (Utils.apiKeyInvalid(defaultVal ?? undefined)) defaultVal = '';
     const promptOptions = {
-      prompt: 'WakaTime Api Key',
-      placeHolder: 'Enter your api key from https://wakatime.com/api-key',
+      prompt: 'Hackatime v2 Api Key',
+      placeHolder: 'Enter your API key from https://hackatime.hackclub.com',
       value: defaultVal!,
       ignoreFocusOut: true,
       password: hidden,
@@ -255,28 +256,27 @@ export class WakaTime {
     };
     vscode.window.showInputBox(promptOptions).then((val) => {
       if (val != undefined) {
-        const invalid = Utils.apiKeyInvalid(val);
+        const trimmed = val.trim();
+        const invalid = Utils.apiKeyInvalid(trimmed);
         if (!invalid) {
-          this.options.setSetting('settings', 'api_key', val, false);
+          this.options.setSettings(
+            'settings',
+            [
+              { key: 'api_url', value: HACKATIME_API_URL },
+              { key: 'api_key', value: trimmed },
+            ],
+            false,
+          );
         } else vscode.window.setStatusBarMessage(invalid);
-      } else vscode.window.setStatusBarMessage('WakaTime api key not provided');
+      } else vscode.window.setStatusBarMessage('Hackatime api key not provided');
     });
   }
 
   public async promptForApiUrl(): Promise<void> {
-    const apiUrl = await this.options.getApiUrl(true);
-    const promptOptions = {
-      prompt: 'WakaTime Api Url (Defaults to https://api.wakatime.com/api/v1)',
-      placeHolder: 'https://api.wakatime.com/api/v1',
-      value: apiUrl,
-      ignoreFocusOut: true,
-      validateInput: Utils.validateApiUrl.bind(this),
-    };
-    vscode.window.showInputBox(promptOptions).then((val) => {
-      if (val) {
-        this.options.setSetting('settings', 'api_url', val, false);
-      }
-    });
+    this.options.setSetting('settings', 'api_url', HACKATIME_API_URL, false);
+    vscode.window.showInformationMessage(
+      `Locked to Hackatime v2 (${HACKATIME_API_URL})`,
+    );
   }
 
   public promptForProxy(): void {
